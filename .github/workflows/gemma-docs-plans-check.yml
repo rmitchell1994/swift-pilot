@@ -1,0 +1,39 @@
+name: Gemma docs/plans check
+
+on:
+  pull_request:
+
+jobs:
+  check-docs-plans:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for a docs/plans entry on gemma/issue-* branches
+        run: |
+          HEAD_REF="${{ github.head_ref }}"
+
+          if [[ ! "$HEAD_REF" =~ ^gemma/issue-([0-9]+) ]]; then
+            echo "Not a gemma/issue-* branch — nothing to check."
+            exit 0
+          fi
+
+          ISSUE_NUMBER="${BASH_REMATCH[1]}"
+          git fetch origin "${{ github.base_ref }}"
+
+          COUNT=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -cE "^docs/plans/${ISSUE_NUMBER}-[^/]*\.md$" || true)
+
+          if [[ "$COUNT" -eq 0 ]]; then
+            echo "::error::No docs/plans/${ISSUE_NUMBER}-*.md file found in this PR's diff — see issue #115 for the naming convention."
+            exit 1
+          fi
+
+          if [[ "$COUNT" -gt 1 ]]; then
+            echo "::error::Expected exactly one docs/plans/${ISSUE_NUMBER}-*.md file in this PR's diff, found ${COUNT}:"
+            git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -E "^docs/plans/${ISSUE_NUMBER}-[^/]*\.md$"
+            exit 1
+          fi
+
+          echo "Found exactly one docs/plans/${ISSUE_NUMBER}-*.md — check passed."
